@@ -21,7 +21,7 @@ const generateSlug = (title: string, idx: number) =>
 
 export const seedDatabase = async (opts?: { reduceCandidates?: boolean }) => {
   try {
-    // ✅ Only seed if DB is empty
+   
     const jobCount = await db.jobs.count();
     if (jobCount > 0) {
       console.log("Database already seeded, skipping reseed");
