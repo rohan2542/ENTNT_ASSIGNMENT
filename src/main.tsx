@@ -1,5 +1,36 @@
 
 
+// import { StrictMode } from "react";
+// import { createRoot } from "react-dom/client";
+// import App from "./App";
+// import "./index.css";
+// import { seedDatabase } from "./lib/seed-data";
+// import { initMSW } from "./lib/init-msw";
+
+// async function init() {
+//   // Start MSW in both dev & prod
+//   if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "production") {
+//     await initMSW();
+
+//     // Seed database
+//     // In dev: use reduced candidates for faster load
+//     // In prod: seed full dataset
+//     await seedDatabase({
+//       reduceCandidates: process.env.NODE_ENV === "development",
+//     });
+//   }
+
+//   createRoot(document.getElementById("root")!).render(
+//     <StrictMode>
+//       <App />
+//     </StrictMode>
+//   );
+// }
+
+// init();
+
+
+// src/main.tsx
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
@@ -8,18 +39,19 @@ import { seedDatabase } from "./lib/seed-data";
 import { initMSW } from "./lib/init-msw";
 
 async function init() {
-  try {
-    // Start MSW in both dev & prod
+  // Start MSW in both dev & prod
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "production") {
     await initMSW();
 
     // Seed database
-    await seedDatabase();
-    
-    console.log("Application initialized successfully");
-  } catch (error) {
-    console.error("Initialization error:", error);
-    // Continue with app startup even if initialization fails
+    // In dev: use reduced candidates for faster load
+    // In prod: seed full dataset
+    await seedDatabase({
+      reduceCandidates: process.env.NODE_ENV === "development",
+    });
   }
+  // In prod: no auto-seed, keep data stable
+  // (Reseed Database button can still call seedDatabase() if needed)
 
   createRoot(document.getElementById("root")!).render(
     <StrictMode>

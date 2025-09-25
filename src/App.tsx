@@ -62,7 +62,7 @@ function App() {
                   element={<AssessmentRuntime />}
                 />
 
-                <Route path="settings" element={<SettingsPage />} />
+                {/* <Route path="settings" element={<SettingsPage />} /> */}
                 <Route path="profile" element={<ProfilePage />} />
               </Route>
             </Routes>

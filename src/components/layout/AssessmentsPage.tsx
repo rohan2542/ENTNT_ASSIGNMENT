@@ -48,7 +48,7 @@ export default function AssessmentsPage() {
   return (
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Assessments</h1>
+        <h1 className="text-2xl font-bold text-black">Assessments</h1>
         <Link
           to="/assessments/new"
           className="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
@@ -64,7 +64,7 @@ export default function AssessmentsPage() {
           {assessments.map((a) => (
             <div
               key={a.jobId ?? a.id}
-              className="p-4 bg-white shadow rounded-md flex justify-between"
+              className="p-4 bg-white shadow rounded-md flex justify-between text-black"
             >
               <div>
                 <h2 className="font-semibold">{a.title || "Untitled Assessment"}</h2>
