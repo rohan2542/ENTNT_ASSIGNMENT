@@ -270,19 +270,7 @@ npm run test:e2e     # Run E2E tests
 - Add tests for new features
 - Update documentation for API changes
 - Ensure accessibility compliance
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- **MSW Team**: Excellent API mocking solution
-- **Dexie**: Robust IndexedDB wrapper
-- **React Query**: Superior state management
-- **dnd-kit**: Accessible drag-and-drop
-- **Tailwind CSS**: Rapid UI development
-
+- 
 ---
 
 **Built for production-ready frontend hiring platform showcasing modern React architecture**
