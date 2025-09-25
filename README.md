@@ -77,8 +77,8 @@ A modern, production-ready frontend hiring platform built with React, TypeScript
 
 ```bash
 # Clone the repository
-git clone [https://github.com/yourusername/talentflow.git](https://github.com/amanagarwal96/Talentflow_assignement
-cd talentflow_assignement
+git clone (https://github.com/amanagarwal96/Talentflow_assignement
+cd talentflow_assignement)
 
 # Install dependencies
 npm install
