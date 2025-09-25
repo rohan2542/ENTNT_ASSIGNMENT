@@ -1,4 +1,5 @@
 
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
@@ -7,11 +8,16 @@ import { seedDatabase } from "./lib/seed-data";
 import { initMSW } from "./lib/init-msw";
 
 async function init() {
-  // only run msw & seed in development
-  if (process.env.NODE_ENV === "development") {
+  // Start MSW in both dev & prod
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "production") {
     await initMSW();
-    // reduce candidates for faster dev by default
-    await seedDatabase({ reduceCandidates: true });
+
+    // Seed database
+    // In dev: use reduced candidates for faster load
+    // In prod: seed full dataset
+    await seedDatabase({
+      reduceCandidates: process.env.NODE_ENV === "development",
+    });
   }
 
   createRoot(document.getElementById("root")!).render(
