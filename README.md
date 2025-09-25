@@ -270,7 +270,6 @@ npm run test:e2e     # Run E2E tests
 - Add tests for new features
 - Update documentation for API changes
 - Ensure accessibility compliance
-- 
 ---
 
 **Built for production-ready frontend hiring platform showcasing modern React architecture**
