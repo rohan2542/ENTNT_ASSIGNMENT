@@ -1,7 +1,18 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { X, Briefcase, Users, ClipboardList, Settings, Database } from 'lucide-react';
-import { clsx } from 'clsx';
+// src/components/layout/Sidebar.tsx
+import React, { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import {
+  X,
+  Briefcase,
+  Users,
+  ClipboardList,
+  Settings,
+  Database,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+} from "lucide-react";
+import clsx from "clsx";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -9,100 +20,109 @@ interface SidebarProps {
 }
 
 const navigation = [
-  { name: 'Jobs', href: '/jobs', icon: Briefcase },
-  { name: 'Candidates', href: '/candidates', icon: Users },
-  { name: 'Kanban', href: '/kanban', icon: ClipboardList },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: "Jobs", href: "/jobs", icon: Briefcase },
+  { name: "Candidates", href: "/candidates", icon: Users },
+  { name: "Kanban", href: "/kanban", icon: ClipboardList },
+  { name: "Assessments", href: "/assessments", icon: FileText },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
 
   const seedDatabase = async () => {
     try {
-      const { seedDatabase } = await import('../../lib/seed-data');
+      const { seedDatabase } = await import("../../lib/seed-data");
       await seedDatabase();
       window.location.reload();
     } catch (error) {
-      console.error('Failed to seed database:', error);
+      console.error("Failed to seed database:", error);
     }
+  };
+
+  const isActive = (href: string) => {
+    // exact match or starts with href + '/' to handle nested routes like /jobs/123
+    return location.pathname === href || location.pathname.startsWith(href + '/');
   };
 
   return (
     <>
-      {/* Mobile backdrop */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-40 lg:hidden">
           <div
-            className="fixed inset-0 bg-gray-600 bg-opacity-75"
+            className="fixed inset-0 bg-black bg-opacity-50"
             onClick={onClose}
           />
         </div>
       )}
 
-      {/* Sidebar */}
       <div
         className={clsx(
-          'fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 transform transition-transform duration-300 ease-in-out lg:translate-x-0',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
+          "fixed inset-y-0 left-0 z-50 transform transition-all duration-300 ease-in-out bg-gradient-to-b from-slate-900 to-blue-900 text-white",
+          collapsed ? "w-20" : "w-64",
+          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         )}
       >
         <div className="flex h-full flex-col">
-          {/* Header */}
-          <div className="flex h-16 flex-shrink-0 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center space-x-2">
-              <Briefcase className="h-8 w-8 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900 dark:text-white">
-                TalentFlow
-              </span>
-            </div>
+          <div className="flex h-16 items-center justify-between px-4 border-b border-gray-700">
+            {!collapsed && (
+              <div className="flex items-center space-x-2">
+                <Briefcase className="h-8 w-8 text-blue-400" />
+                <span className="text-xl font-bold">TalentFlow</span>
+              </div>
+            )}
             <button
-              type="button"
-              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
-              onClick={onClose}
+              onClick={() => setCollapsed(!collapsed)}
+              className="p-2 rounded-md hover:bg-gray-800"
             >
-              <X className="h-6 w-6" />
+              {collapsed ? (
+                <ChevronRight className="h-5 w-5" />
+              ) : (
+                <ChevronLeft className="h-5 w-5" />
+              )}
             </button>
           </div>
 
-          {/* Navigation */}
           <nav className="flex-1 space-y-1 px-2 py-4">
             {navigation.map((item) => {
-              const isActive = location.pathname.startsWith(item.href);
+              const active = isActive(item.href);
               return (
                 <Link
                   key={item.name}
                   to={item.href}
                   className={clsx(
-                    'group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors',
-                    isActive
-                      ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100'
-                      : 'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white'
+                    "group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors",
+                    active
+                      ? "bg-blue-600 text-white"
+                      : "text-gray-300 hover:bg-gray-800 hover:text-white"
                   )}
                   onClick={onClose}
                 >
                   <item.icon
                     className={clsx(
-                      'mr-3 h-6 w-6 flex-shrink-0',
-                      isActive
-                        ? 'text-blue-500'
-                        : 'text-gray-400 group-hover:text-gray-500'
+                      "h-6 w-6 flex-shrink-0 transition-colors duration-200",
+                      active ? "text-white" : "text-gray-400"
                     )}
                   />
-                  {item.name}
+                  {!collapsed && <span className="ml-3">{item.name}</span>}
                 </Link>
               );
             })}
           </nav>
 
-          {/* Development tools */}
-          <div className="flex-shrink-0 border-t border-gray-200 dark:border-gray-700 p-4">
+          <div className="flex-shrink-0 border-t border-gray-700 p-4">
             <button
               onClick={seedDatabase}
-              className="flex items-center w-full px-2 py-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white rounded-md transition-colors"
+              className={clsx(
+                "flex items-center w-full px-2 py-2 text-sm font-medium rounded-md transition-colors",
+                collapsed
+                  ? "justify-center"
+                  : "text-gray-300 hover:bg-gray-800 hover:text-white"
+              )}
             >
-              <Database className="mr-3 h-5 w-5 text-gray-400" />
-              Reseed Database
+              <Database className="h-5 w-5 text-gray-400" />
+              {!collapsed && <span className="ml-3">Reseed Database</span>}
             </button>
           </div>
         </div>
@@ -110,3 +130,5 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
     </>
   );
 };
+
+export default Sidebar;

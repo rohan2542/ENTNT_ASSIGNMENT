@@ -9,7 +9,7 @@ export const CandidatesList: React.FC = () => {
     search: '',
     stage: '',
     jobId: '',
-    pageSize: 50
+    pageSize: 1000
   });
 
   const { data: candidatesData, isLoading, error } = useCandidates(filters);

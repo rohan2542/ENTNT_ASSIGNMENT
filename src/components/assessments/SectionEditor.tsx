@@ -1,6 +1,8 @@
+// src/components/sections/SectionEditor.tsx
 import React from 'react';
-import { AssessmentSection } from '../../types';
+import { AssessmentSection, Question } from '../../types';
 import { Edit, Trash2, Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { QuestionEditor } from './QuestionEditor';
 
 interface SectionEditorProps {
   section: AssessmentSection;
@@ -8,7 +10,7 @@ interface SectionEditorProps {
   onActivate: () => void;
   onUpdate: (updates: Partial<AssessmentSection>) => void;
   onDelete: () => void;
-  onAddQuestion: () => void;
+  allQuestions: Question[]; // gives context for nested question editors
 }
 
 export const SectionEditor: React.FC<SectionEditorProps> = ({
@@ -17,10 +19,10 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({
   onActivate,
   onUpdate,
   onDelete,
-  onAddQuestion
 }) => {
   const [isEditing, setIsEditing] = React.useState(false);
   const [title, setTitle] = React.useState(section.title);
+  const [activeQuestion, setActiveQuestion] = React.useState<string | null>(null);
 
   const handleSaveTitle = () => {
     onUpdate({ title });
@@ -28,16 +30,39 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSaveTitle();
-    } else if (e.key === 'Escape') {
+    if (e.key === 'Enter') handleSaveTitle();
+    if (e.key === 'Escape') {
       setTitle(section.title);
       setIsEditing(false);
     }
   };
 
+  const handleAddQuestion = () => {
+    const newQ: Question = {
+      id: crypto.randomUUID(),
+      type: 'short-text',
+      title: 'Untitled question',
+      required: false,
+    };
+    onUpdate({ questions: [...section.questions, newQ] });
+    setActiveQuestion(newQ.id);
+  };
+
+  const handleUpdateQuestion = (id: string, updates: Partial<Question>) => {
+    const updatedQs = section.questions.map((q) =>
+      q.id === id ? { ...q, ...updates } : q
+    );
+    onUpdate({ questions: updatedQs });
+  };
+
+  const handleDeleteQuestion = (id: string) => {
+    onUpdate({ questions: section.questions.filter((q) => q.id !== id) });
+    if (activeQuestion === id) setActiveQuestion(null);
+  };
+
   return (
     <div className="border border-gray-200 dark:border-gray-600 rounded-lg">
+      {/* Section header */}
       <div
         className="p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700"
         onClick={onActivate}
@@ -49,7 +74,6 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({
             ) : (
               <ChevronRight className="w-4 h-4 text-gray-400" />
             )}
-            
             {isEditing ? (
               <input
                 value={title}
@@ -64,13 +88,16 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({
                 {section.title}
               </h3>
             )}
-            
             <span className="text-sm text-gray-500">
               ({section.questions.length} questions)
             </span>
           </div>
-          
-          <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
+
+          {/* Inline section controls */}
+          <div
+            className="flex items-center space-x-2"
+            onClick={(e) => e.stopPropagation()} // prevent toggle when clicking buttons
+          >
             <button
               onClick={() => setIsEditing(true)}
               className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded"
@@ -86,51 +113,34 @@ export const SectionEditor: React.FC<SectionEditorProps> = ({
           </div>
         </div>
       </div>
-      
+
+      {/* Expandable content */}
       {isActive && (
         <div className="border-t border-gray-200 dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-700">
           <div className="flex justify-between items-center mb-4">
             <h4 className="font-medium text-gray-900 dark:text-white">Questions</h4>
             <button
-              onClick={onAddQuestion}
+              onClick={handleAddQuestion}
               className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded-md flex items-center space-x-1 text-sm transition-colors"
             >
               <Plus className="h-4 w-4" />
               <span>Add Question</span>
             </button>
           </div>
-          
-          <div className="space-y-2">
-            {section.questions.map((question, index) => (
-              <div
+
+          <div className="space-y-3">
+            {section.questions.map((question) => (
+              <QuestionEditor
                 key={question.id}
-                onClick={() => {
-                  // This would trigger question selection in the parent component
-                  // For now, we'll just log it
-                  console.log('Question selected:', question.id);
-                }}
-                className="p-3 bg-white dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600 cursor-pointer transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {question.title}
-                    </span>
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-xs rounded">
-                        {question.type}
-                      </span>
-                      {question.required && (
-                        <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 text-xs rounded">
-                          Required
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+                question={question}
+                allQuestions={section.questions} // provides context for dependencies/validations
+                isActive={activeQuestion === question.id}
+                onActivate={() => setActiveQuestion(question.id)}
+                onUpdate={(updates) => handleUpdateQuestion(question.id, updates)}
+                onDelete={() => handleDeleteQuestion(question.id)}
+              />
             ))}
-            
+
             {section.questions.length === 0 && (
               <div className="text-center py-6 text-gray-500 dark:text-gray-400">
                 No questions yet. Click "Add Question" to get started.

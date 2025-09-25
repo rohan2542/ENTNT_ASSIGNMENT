@@ -1,3 +1,4 @@
+// src/components/assessments/AssessmentRuntime.tsx
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAssessment, useSubmitAssessment } from '../../hooks/useAssessments';
@@ -5,29 +6,35 @@ import { AssessmentForm } from './AssessmentForm';
 import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 export const AssessmentRuntime: React.FC = () => {
-  const { jobId } = useParams<{ jobId: string }>();
+  const { jobId, id } = useParams<{ jobId?: string; id?: string }>();
+  const param = jobId ?? id;
   const navigate = useNavigate();
-  const { data: assessment, isLoading } = useAssessment(jobId!);
+
+  if (!param) {
+    return (
+      <div className="text-center py-12 text-gray-500 text-lg">
+        Invalid assessment URL
+      </div>
+    );
+  }
+
+  const { data: assessment, isLoading, isError } = useAssessment(param);
   const submitMutation = useSubmitAssessment();
-  
+
   const [responses, setResponses] = useState<Record<string, any>>({});
 
   const handleResponseChange = (questionId: string, value: any) => {
-    setResponses(prev => ({
-      ...prev,
-      [questionId]: value
-    }));
+    setResponses((prev) => ({ ...prev, [questionId]: value }));
   };
 
+  // Validates required fields and submits assessment answers
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     if (!assessment) return;
 
-    // Validate required fields
-    const allQuestions = assessment.sections.flatMap(section => section.questions);
-    const missingRequired = allQuestions.filter(q => 
-      q.required && (!responses[q.id] || responses[q.id] === '')
+    const allQuestions = assessment.sections.flatMap((s) => s.questions);
+    const missingRequired = allQuestions.filter(
+      (q) => q.required && (responses[q.id] === undefined || responses[q.id] === '')
     );
 
     if (missingRequired.length > 0) {
@@ -37,16 +44,18 @@ export const AssessmentRuntime: React.FC = () => {
 
     try {
       await submitMutation.mutateAsync({
-        jobId: jobId!,
+        jobId: assessment.jobId,
+        assessmentId: assessment.id,
+        candidateId: 'demo-candidate', // Replace with actual candidate context
         answers: Object.entries(responses).map(([questionId, value]) => ({
           questionId,
-          value
-        }))
+          value,
+        })),
       });
-      
       navigate('/assessments/thank-you');
-    } catch (error) {
-      console.error('Failed to submit assessment:', error);
+    } catch (err) {
+      console.error('Failed to submit assessment:', err);
+      alert('Submission failed');
     }
   };
 
@@ -58,10 +67,10 @@ export const AssessmentRuntime: React.FC = () => {
     );
   }
 
-  if (!assessment) {
+  if (isError || !assessment) {
     return (
-      <div className="text-center py-12">
-        <div className="text-gray-500 text-lg">Assessment not found</div>
+      <div className="text-center py-12 text-red-500 text-lg">
+        Failed to load assessment
       </div>
     );
   }
@@ -70,9 +79,11 @@ export const AssessmentRuntime: React.FC = () => {
     <div className="max-w-3xl mx-auto">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Assessment</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+            {assessment.title}
+          </h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
-            Please complete all sections of this assessment. Required fields are marked with *.
+            Please complete all sections. Required fields are marked with *.
           </p>
         </div>
 
@@ -82,14 +93,16 @@ export const AssessmentRuntime: React.FC = () => {
             responses={responses}
             onResponseChange={handleResponseChange}
           />
-          
+
           <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
             <button
               type="submit"
-              disabled={submitMutation.isPending}
+              disabled={submitMutation.isPending || submitMutation.isLoading}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
             >
-              {submitMutation.isPending ? 'Submitting...' : 'Submit Assessment'}
+              {submitMutation.isPending || submitMutation.isLoading
+                ? 'Submitting...'
+                : 'Submit Assessment'}
             </button>
           </div>
         </form>

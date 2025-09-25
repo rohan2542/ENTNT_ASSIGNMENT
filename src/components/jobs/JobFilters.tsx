@@ -18,8 +18,6 @@ const COMMON_TAGS = [
 ];
 
 const SORT_OPTIONS = [
-  { value: 'order:asc', label: 'Order (A-Z)' },
-  { value: 'order:desc', label: 'Order (Z-A)' },
   { value: 'title:asc', label: 'Title (A-Z)' },
   { value: 'title:desc', label: 'Title (Z-A)' },
   { value: 'createdAt:desc', label: 'Newest First' },
@@ -118,15 +116,11 @@ export const JobFilters: React.FC<JobFiltersProps> = ({ filters, onChange }) => 
               <button
                 key={tag}
                 onClick={() => handleTagToggle(tag)}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  isSelected
-                    ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                    : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                } dark:${
-                  isSelected
-                    ? 'bg-blue-900 text-blue-200 border-blue-700'
-                    : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
-                }`}
+                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors border
+                  ${isSelected
+                    ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-700'
+                    : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:hover:bg-gray-600'
+                  }`}
               >
                 {tag}
               </button>

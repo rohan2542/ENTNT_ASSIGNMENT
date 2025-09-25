@@ -1,3 +1,6 @@
+
+
+// src/hooks/useCandidates.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Candidate, PaginatedResponse, TimelineEntry, ApiError } from '../types';
 import toast from 'react-hot-toast';
@@ -12,21 +15,24 @@ interface CandidatesParams {
 
 const fetchCandidates = async (params: CandidatesParams): Promise<PaginatedResponse<Candidate>> => {
   const urlParams = new URLSearchParams();
-  
+
   if (params.search) urlParams.append('search', params.search);
   if (params.stage) urlParams.append('stage', params.stage);
   if (params.jobId) urlParams.append('jobId', params.jobId);
   if (params.page) urlParams.append('page', params.page.toString());
   if (params.pageSize) urlParams.append('pageSize', params.pageSize.toString());
 
-  const response = await fetch(`/api/candidates?${urlParams}`);
-  
+  const response = await fetch(`/api/candidates?${urlParams.toString()}`);
+
   if (!response.ok) {
     const error: ApiError = await response.json();
     throw new Error(error.error || 'Failed to fetch candidates');
   }
-  
-  return response.json();
+
+  const result = await response.json();
+  // hydrate date fields
+  result.data = result.data.map((c: any) => ({ ...c, createdAt: c.createdAt ? new Date(c.createdAt) : new Date() }));
+  return result;
 };
 
 const updateCandidate = async ({ id, ...updates }: Partial<Candidate> & { id: string }): Promise<Candidate> => {
@@ -35,36 +41,38 @@ const updateCandidate = async ({ id, ...updates }: Partial<Candidate> & { id: st
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(updates)
   });
-  
+
   if (!response.ok) {
     const error: ApiError = await response.json();
     throw new Error(error.error || 'Failed to update candidate');
   }
-  
+
   return response.json();
 };
 
 const fetchTimeline = async (candidateId: string): Promise<TimelineEntry[]> => {
   const response = await fetch(`/api/candidates/${candidateId}/timeline`);
-  
+
   if (!response.ok) {
     const error: ApiError = await response.json();
     throw new Error(error.error || 'Failed to fetch timeline');
   }
-  
-  return response.json();
+
+  const data = await response.json();
+  return data.map((t: any) => ({ ...t, timestamp: t.timestamp ? new Date(t.timestamp) : new Date() }));
 };
 
 export const useCandidates = (params: CandidatesParams = {}) => {
+  const { search = '', stage = '', jobId = '', page = 1, pageSize = 50 } = params;
   return useQuery({
-    queryKey: ['candidates', params],
-    queryFn: () => fetchCandidates(params)
+    queryKey: ['candidates', search, stage, jobId, page, pageSize],
+    queryFn: () => fetchCandidates({ search, stage, jobId, page, pageSize })
   });
 };
 
 export const useUpdateCandidate = () => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: updateCandidate,
     onSuccess: () => {
@@ -84,3 +92,5 @@ export const useTimeline = (candidateId: string) => {
     enabled: !!candidateId
   });
 };
+
+

@@ -1,330 +1,303 @@
+// src/lib/msw-handlers.ts
 import { http, HttpResponse } from 'msw';
 import { db } from './database';
-import { Job, Candidate, PaginatedResponse, ApiError } from '../types';
+import { Job, PaginatedResponse, Candidate } from '../types';
 
-const delay = () => Math.random() * 1000 + 200; // 200-1200ms
-const shouldError = (errorRate: number = 0.05) => {
-  // Allow global override for testing
-  const globalRate = (window as any).__MSW_ERROR_RATE__;
-  const rate = globalRate !== undefined ? globalRate : errorRate;
-  return Math.random() < rate;
-};
+const delay = (min = 200, max = 1200) =>
+  new Promise((res) => setTimeout(res, Math.random() * (max - min) + min));
 
-const simulatedError = (): HttpResponse => {
-  return HttpResponse.json(
-    { error: 'Simulated server error' } as ApiError,
-    { status: 500 }
-  );
-};
+const maybeFail = (rate = 0.05) => Math.random() < rate;
 
 export const handlers = [
-  // Jobs endpoints
+  // ---------------- JOBS ----------------
   http.get('/api/jobs', async ({ request }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
+    await delay();
+    try {
+      const url = new URL(request.url);
+      const search = url.searchParams.get('search') || '';
+      const status = url.searchParams.get('status') || '';
+      const tags = url.searchParams.getAll('tags');
+      const page = Number(url.searchParams.get('page') || '1');
+      const pageSize = Number(url.searchParams.get('pageSize') || '10');
+      const sort = url.searchParams.get('sort') || 'order:asc';
 
-    const url = new URL(request.url);
-    const search = url.searchParams.get('search') || '';
-    const status = url.searchParams.get('status') || '';
-    const tags = url.searchParams.getAll('tags');
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const pageSize = parseInt(url.searchParams.get('pageSize') || '10');
-    const sort = url.searchParams.get('sort') || 'order:asc';
+      let jobs = await db.jobs.toArray();
 
-    let query = db.jobs.orderBy('order');
-    let jobs = await query.toArray();
-
-    // Apply filters
-    if (search) {
-      jobs = jobs.filter(job => 
-        job.title.toLowerCase().includes(search.toLowerCase())
-      );
-    }
-
-    if (status) {
-      jobs = jobs.filter(job => job.status === status);
-    }
-
-    if (tags.length > 0) {
-      jobs = jobs.filter(job => 
-        tags.some(tag => job.tags.includes(tag))
-      );
-    }
-
-    // Apply sorting
-    const [field, direction] = sort.split(':');
-    jobs.sort((a, b) => {
-      let aVal = a[field as keyof Job];
-      let bVal = b[field as keyof Job];
-      
-      if (field === 'createdAt' || field === 'updatedAt') {
-        aVal = new Date(aVal as Date).getTime();
-        bVal = new Date(bVal as Date).getTime();
+      if (search) {
+        jobs = jobs.filter((j) =>
+          (j.title || '').toLowerCase().includes(search.toLowerCase())
+        );
       }
-      
-      if (direction === 'desc') {
-        return bVal > aVal ? 1 : -1;
+      if (status) {
+        jobs = jobs.filter((j) => j.status === status);
       }
-      return aVal > bVal ? 1 : -1;
-    });
+      if (tags.length) {
+        jobs = jobs.filter((j) => tags.some((t) => j.tags?.includes(t)));
+      }
 
-    // Apply pagination
-    const total = jobs.length;
-    const start = (page - 1) * pageSize;
-    const paginatedJobs = jobs.slice(start, start + pageSize);
+      const [field, dir] = sort.split(':');
+      jobs.sort((a: any, b: any) => {
+        const aVal = a[field];
+        const bVal = b[field];
+        if (dir === 'desc') return aVal < bVal ? 1 : -1;
+        return aVal > bVal ? 1 : -1;
+      });
 
-    const response: PaginatedResponse<Job> = {
-      data: paginatedJobs,
-      page,
-      pageSize,
-      total
-    };
+      const total = jobs.length;
+      const start = (page - 1) * pageSize;
+      const pageData = jobs.slice(start, start + pageSize);
 
-    return HttpResponse.json(response);
+      const payload: PaginatedResponse<Job> = {
+        data: pageData,
+        page,
+        pageSize,
+        total,
+      };
+      return HttpResponse.json(payload);
+    } catch (err) {
+      console.error('/api/jobs error', err);
+      return HttpResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
   }),
 
   http.post('/api/jobs', async ({ request }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
-
-    const newJob = await request.json() as Partial<Job>;
-    
-    // Check slug uniqueness
-    const existingJob = await db.jobs.where('slug').equals(newJob.slug!).first();
-    if (existingJob) {
-      return HttpResponse.json(
-        { error: 'Slug already exists' },
-        { status: 409 }
-      );
+    await delay();
+    if (maybeFail(0.05)) {
+      return HttpResponse.json({ error: 'Simulated write error' }, { status: 500 });
     }
-
-    const job: Job = {
-      id: crypto.randomUUID(),
-      title: newJob.title!,
-      slug: newJob.slug!,
-      status: newJob.status || 'active',
-      tags: newJob.tags || [],
-      order: (await db.jobs.count()) + 1,
+    const body = await request.json();
+    const id = crypto.randomUUID();
+    const count = await db.jobs.count();
+    const job = {
+      id,
+      title: body.title || 'Untitled',
+      slug: body.slug || `untitled-${id.substring(0, 6)}`,
+      status: body.status || 'active',
+      tags: body.tags || [],
+      order: count + 1,
       createdAt: new Date(),
-      updatedAt: new Date()
+      updatedAt: new Date(),
     };
-
     await db.jobs.add(job);
-    return HttpResponse.json(job);
+    return HttpResponse.json(job, { status: 201 });
   }),
 
-  http.patch('/api/jobs/:id', async ({ params, request }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
-
-    const jobId = params.id as string;
-    const updates = await request.json() as Partial<Job>;
-    
-    // Check slug uniqueness if updating slug
-    if (updates.slug) {
-      const existingJob = await db.jobs.where('slug').equals(updates.slug).first();
-      if (existingJob && existingJob.id !== jobId) {
-        return HttpResponse.json(
-          { error: 'Slug already exists' },
-          { status: 409 }
-        );
-      }
+  http.patch('/api/jobs/:id', async ({ request, params }) => {
+    await delay();
+    if (maybeFail(0.05)) {
+      return HttpResponse.json({ error: 'Simulated error' }, { status: 500 });
     }
-
-    await db.jobs.update(jobId, { ...updates, updatedAt: new Date() });
-    const updatedJob = await db.jobs.get(jobId);
-    
-    return HttpResponse.json(updatedJob);
+    const { id } = params;
+    const updates = await request.json();
+    await db.jobs.update(id as string, { ...updates, updatedAt: new Date() });
+    const updated = await db.jobs.get(id as string);
+    return HttpResponse.json(updated);
   }),
 
+  // ---------------- JOBS REORDER ----------------
   http.patch('/api/jobs/:id/reorder', async ({ params, request }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    // Higher error rate for reorder to test rollback
-    if (shouldError(0.1)) {
-      console.log('MSW: Simulating reorder error for testing');
-      return simulatedError();
+    await delay();
+    const { id } = params;
+    const body = await request.json().catch(() => ({}));
+
+    if (body.order === undefined || body.order === null) {
+      return HttpResponse.json({ error: 'Order is required' }, { status: 400 });
     }
 
-    const jobId = params.id as string;
-    const { fromOrder, toOrder } = await request.json() as { fromOrder: number; toOrder: number };
+    const toOrder = Number(body.order);
+    const all = await db.jobs.orderBy('order').toArray();
+    const movingIndex = all.findIndex((j) => j.id === id);
+    if (movingIndex === -1) return HttpResponse.json({ error: 'Job not found' }, { status: 404 });
 
-    const jobs = await db.jobs.orderBy('order').toArray();
-    
-    // Update order for all affected jobs
-    const jobToMove = jobs.find(j => j.id === jobId);
-    if (!jobToMove) {
-      return HttpResponse.json({ error: 'Job not found' }, { status: 404 });
+    const moving = all.splice(movingIndex, 1)[0];
+
+    let insertAt = all.findIndex((j) => j.order >= toOrder);
+    if (insertAt === -1) insertAt = all.length;
+    all.splice(insertAt, 0, moving);
+
+    for (let i = 0; i < all.length; i++) {
+      all[i].order = i + 1;
+      all[i].updatedAt = new Date();
+      await db.jobs.put(all[i]);
     }
 
-    // Reorder logic
-    if (fromOrder < toOrder) {
-      // Moving down: shift jobs between fromOrder and toOrder up
-      for (const job of jobs) {
-        if (job.order > fromOrder && job.order <= toOrder) {
-          await db.jobs.update(job.id, { order: job.order - 1 });
-        }
-      }
-    } else {
-      // Moving up: shift jobs between toOrder and fromOrder down
-      for (const job of jobs) {
-        if (job.order >= toOrder && job.order < fromOrder) {
-          await db.jobs.update(job.id, { order: job.order + 1 });
-        }
-      }
-    }
-
-    // Update the moved job's order
-    await db.jobs.update(jobId, { order: toOrder });
-
-    return HttpResponse.json({ fromOrder, toOrder });
+    const updated = await db.jobs.get(id as string);
+    return HttpResponse.json(updated, { status: 200 });
   }),
 
-  // Candidates endpoints
+  // ---------------- CANDIDATES ----------------
   http.get('/api/candidates', async ({ request }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
-
+    await delay();
     const url = new URL(request.url);
+
     const search = url.searchParams.get('search') || '';
     const stage = url.searchParams.get('stage') || '';
     const jobId = url.searchParams.get('jobId') || '';
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const pageSize = parseInt(url.searchParams.get('pageSize') || '50');
+    const page = Number(url.searchParams.get('page') || '1');
+    const pageSize = Number(url.searchParams.get('pageSize') || '20');
 
     let candidates = await db.candidates.toArray();
 
-    // Apply filters
     if (search) {
-      const searchLower = search.toLowerCase();
-      candidates = candidates.filter(candidate => 
-        candidate.name.toLowerCase().includes(searchLower) ||
-        candidate.email.toLowerCase().includes(searchLower)
+      candidates = candidates.filter(c =>
+        c.name.toLowerCase().includes(search.toLowerCase()) ||
+        c.email.toLowerCase().includes(search.toLowerCase())
       );
     }
-
     if (stage) {
-      candidates = candidates.filter(candidate => candidate.stage === stage);
+      candidates = candidates.filter(c => c.stage === stage);
     }
-
     if (jobId) {
-      candidates = candidates.filter(candidate => candidate.jobId === jobId);
+      candidates = candidates.filter(c => c.jobId === jobId);
     }
 
-    // Sort by creation date (newest first)
-    candidates.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-    // Apply pagination
     const total = candidates.length;
     const start = (page - 1) * pageSize;
-    const paginatedCandidates = candidates.slice(start, start + pageSize);
+    const pageData = candidates.slice(start, start + pageSize);
 
-    const response: PaginatedResponse<Candidate> = {
-      data: paginatedCandidates,
+    return HttpResponse.json({
+      data: pageData,
       page,
       pageSize,
-      total
-    };
+      total,
+    });
+  }),
 
-    return HttpResponse.json(response);
+  http.get('/api/candidates/:id', async ({ params }) => {
+    await delay();
+    const candidate = await db.candidates.get(params.id as string);
+    if (!candidate) {
+      return HttpResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    return HttpResponse.json(candidate);
+  }),
+
+  http.post('/api/candidates', async ({ request }) => {
+    await delay();
+    const body = await request.json();
+    const candidate: Candidate = {
+      id: crypto.randomUUID(),
+      name: body.name,
+      email: body.email,
+      jobId: body.jobId,
+      stage: 'applied',
+      createdAt: new Date(),
+    };
+    await db.candidates.add(candidate);
+    return HttpResponse.json(candidate, { status: 201 });
   }),
 
   http.patch('/api/candidates/:id', async ({ params, request }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
-
-    const candidateId = params.id as string;
-    const updates = await request.json() as Partial<Candidate>;
-    
-    const candidate = await db.candidates.get(candidateId);
-    if (!candidate) {
-      return HttpResponse.json({ error: 'Candidate not found' }, { status: 404 });
-    }
-
-    // If stage is being updated, add timeline entry
-    if (updates.stage && updates.stage !== candidate.stage) {
-      await db.timelines.add({
-        id: crypto.randomUUID(),
-        candidateId,
-        timestamp: new Date(),
-        fromStage: candidate.stage,
-        toStage: updates.stage,
-        notes: `Stage changed from ${candidate.stage} to ${updates.stage}`
-      });
-    }
-
-    await db.candidates.update(candidateId, updates);
-    const updatedCandidate = await db.candidates.get(candidateId);
-    
-    return HttpResponse.json(updatedCandidate);
+    await delay();
+    const updates = await request.json();
+    await db.candidates.update(params.id as string, updates);
+    const updated = await db.candidates.get(params.id as string);
+    return HttpResponse.json(updated);
   }),
 
+  // ---------------- CANDIDATE TIMELINE ----------------
   http.get('/api/candidates/:id/timeline', async ({ params }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
-
-    const candidateId = params.id as string;
+    await delay();
+    const { id } = params;
     const timeline = await db.timelines
       .where('candidateId')
-      .equals(candidateId)
-      .orderBy('timestamp')
-      .toArray();
-    
+      .equals(id as string)
+      .sortBy('timestamp');
+
     return HttpResponse.json(timeline);
   }),
 
-  // Assessment endpoints
-  http.get('/api/assessments/:jobId', async ({ params }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
+  http.post('/api/candidates/reorder', async ({ request }) => {
+    await delay();
+    const updates: { id: string; stage: string }[] = await request.json();
 
-    const jobId = params.jobId as string;
-    const assessment = await db.assessments.get(jobId);
-    
-    return HttpResponse.json(assessment || null);
-  }),
+    for (const { id, stage } of updates) {
+      await db.candidates.update(id, { stage, updatedAt: new Date() as any });
+      await db.timelines.add({
+        id: crypto.randomUUID(),
+        candidateId: id,
+        timestamp: new Date(),
+        fromStage: null,
+        toStage: stage,
+        notes: 'Stage updated via reorder'
+      } as any);
+    }
 
-  http.put('/api/assessments/:jobId', async ({ params, request }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
-
-    const jobId = params.jobId as string;
-    const assessment = await request.json();
-    
-    await db.assessments.put({
-      jobId,
-      ...assessment,
-      updatedAt: new Date()
-    });
-    
     return HttpResponse.json({ success: true });
   }),
 
-  http.post('/api/assessments/:jobId/submit', async ({ params, request }) => {
-    await new Promise(resolve => setTimeout(resolve, delay()));
-    
-    if (shouldError()) return simulatedError();
+  // ---------------- ASSESSMENTS ----------------
+  http.get('/api/assessments/:jobId', async ({ params }) => {
+    await delay();
+    const { jobId } = params;
+    let assessment = await db.assessments.where('jobId').equals(jobId as string).first();
 
-    const jobId = params.jobId as string;
-    const submission = await request.json();
-    
-    const response = {
+    if (!assessment) {
+      assessment = {
+        id: crypto.randomUUID(),
+        jobId,
+        title: 'New Assessment',
+        status: 'draft',
+        sections: [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as any;
+      await db.assessments.add(assessment);
+    }
+
+    return HttpResponse.json(assessment);
+  }),
+
+  http.get('/api/assessments/by-id/:id', async ({ params }) => {
+    await delay();
+    const { id } = params;
+    const assessment = await db.assessments.get(id as string);
+    if (!assessment) {
+      return HttpResponse.json({ error: 'Not found' }, { status: 404 });
+    }
+    return HttpResponse.json(assessment);
+  }),
+  http.put('/api/assessments/:jobId', async ({ request, params }) => {
+  await delay();
+  const { jobId } = params;
+  const body = await request.json().catch(() => ({}));
+
+  const existing = await db.assessments.where('jobId').equals(jobId as string).first();
+  const id = existing?.id ?? crypto.randomUUID();
+
+  const toSave = {
+    id,
+    jobId,
+    title: body.title ?? existing?.title ?? 'Untitled Assessment',
+    description: body.description ?? existing?.description ?? '',
+    status: body.status ?? existing?.status ?? 'draft',
+    sections: Array.isArray(body.sections) ? body.sections : existing?.sections ?? [],
+    createdAt: existing?.createdAt ?? new Date(),
+    updatedAt: new Date(),
+  };
+
+  await db.assessments.put(toSave);
+  return HttpResponse.json(toSave, { status: 200 });
+}),
+
+
+  // ✅ FIXED: Always return JSON body
+  http.post('/api/assessments/:jobId/submit', async ({ request, params }) => {
+    await delay();
+    const { jobId } = params;
+    const payload = await request.json().catch(() => ({}));
+
+    const entry = {
       id: crypto.randomUUID(),
+      assessmentId: payload.assessmentId,
       jobId,
+      candidateId: payload.candidateId || 'mock-candidate',
+      answers: payload.answers || [],
       submittedAt: new Date(),
-      ...submission
     };
-    
-    await db.responses.add(response);
-    
-    return HttpResponse.json(response);
-  })
+
+    await db.responses.add(entry as any);
+    return HttpResponse.json(entry, { status: 201 });
+  }),
 ];
+

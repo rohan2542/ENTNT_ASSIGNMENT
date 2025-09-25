@@ -1,9 +1,11 @@
+// src/components/jobs/JobEditor.tsx
 import React, { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCreateJob, useUpdateJob, useJobs } from '../../hooks/useJobs';
-import { X, Plus } from 'lucide-react';
+import { X } from 'lucide-react';
+import { JobTagSelector } from "./JobTagSelector";
 
 const jobSchema = z.object({
   title: z.string().min(1, 'Title is required'),
@@ -23,7 +25,6 @@ export const JobEditor: React.FC<JobEditorProps> = ({ jobId, onClose }) => {
   const createMutation = useCreateJob();
   const updateMutation = useUpdateJob();
   const { data: jobsData } = useJobs();
-  const [newTag, setNewTag] = React.useState('');
 
   const isEditing = !!jobId;
   const existingJob = jobsData?.data.find(job => job.id === jobId);
@@ -34,21 +35,34 @@ export const JobEditor: React.FC<JobEditorProps> = ({ jobId, onClose }) => {
     formState: { errors, isSubmitting },
     setValue,
     watch,
-    setError
+    setError,
+    reset
   } = useForm<JobFormData>({
     resolver: zodResolver(jobSchema),
     defaultValues: {
-      title: existingJob?.title || '',
-      slug: existingJob?.slug || '',
-      status: existingJob?.status || 'active',
-      tags: existingJob?.tags || []
+      title: '',
+      slug: '',
+      status: 'active',
+      tags: []
     }
   });
 
   const watchedTitle = watch('title');
   const watchedTags = watch('tags');
 
-  // Auto-generate slug from title
+  // When editing, populate form
+  useEffect(() => {
+    if (existingJob) {
+      reset({
+        title: existingJob.title || '',
+        slug: existingJob.slug || '',
+        status: existingJob.status || 'active',
+        tags: existingJob.tags || []
+      });
+    }
+  }, [existingJob, reset]);
+
+  // Auto-generate slug from title when creating
   useEffect(() => {
     if (!isEditing && watchedTitle) {
       const slug = watchedTitle
@@ -74,26 +88,8 @@ export const JobEditor: React.FC<JobEditorProps> = ({ jobId, onClose }) => {
       if (errorMessage.includes('Slug already exists') || errorMessage.includes('already taken')) {
         setError('slug', { message: 'This slug is already taken' });
       } else {
-        setError('root', { message: errorMessage });
+        setError('title', { message: errorMessage });
       }
-    }
-  };
-
-  const addTag = () => {
-    if (newTag.trim() && !watchedTags.includes(newTag.trim())) {
-      setValue('tags', [...watchedTags, newTag.trim()]);
-      setNewTag('');
-    }
-  };
-
-  const removeTag = (tagToRemove: string) => {
-    setValue('tags', watchedTags.filter(tag => tag !== tagToRemove));
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      addTag();
     }
   };
 
@@ -167,40 +163,10 @@ export const JobEditor: React.FC<JobEditorProps> = ({ jobId, onClose }) => {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Tags
             </label>
-            <div className="flex gap-2 mb-2">
-              <input
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyPress={handleKeyPress}
-                type="text"
-                placeholder="Add a tag..."
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-              <button
-                type="button"
-                onClick={addTag}
-                className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {watchedTags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm rounded-full"
-                >
-                  {tag}
-                  <button
-                    type="button"
-                    onClick={() => removeTag(tag)}
-                    className="ml-2 text-blue-600 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-100"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ))}
-            </div>
+            <JobTagSelector
+              value={watchedTags}
+              onChange={(tags) => setValue("tags", tags)}
+            />
           </div>
 
           {/* Actions */}
