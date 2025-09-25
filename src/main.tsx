@@ -8,16 +8,17 @@ import { seedDatabase } from "./lib/seed-data";
 import { initMSW } from "./lib/init-msw";
 
 async function init() {
-  // Start MSW in both dev & prod
-  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "production") {
+  try {
+    // Start MSW in both dev & prod
     await initMSW();
 
     // Seed database
-    // In dev: use reduced candidates for faster load
-    // In prod: seed full dataset
-    await seedDatabase({
-      reduceCandidates: process.env.NODE_ENV === "development",
-    });
+    await seedDatabase();
+    
+    console.log("Application initialized successfully");
+  } catch (error) {
+    console.error("Initialization error:", error);
+    // Continue with app startup even if initialization fails
   }
 
   createRoot(document.getElementById("root")!).render(

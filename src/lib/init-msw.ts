@@ -12,18 +12,23 @@ export const initMSW = async () => {
     return;
   }
 
-  // Load worker dynamically
-  const { worker } = await import("./msw-browser");
+  try {
+    // Load worker dynamically
+    const { worker } = await import("./msw-browser");
 
-  // Start worker for both development & production
-  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "production") {
+    // Start worker for both development & production
     await worker.start({
       serviceWorker: {
-        url: "/mockServiceWorker.js", // required for Netlify
+        url: "/mockServiceWorker.js",
       },
       onUnhandledRequest: "bypass",
+      quiet: process.env.NODE_ENV === "production", // Reduce console noise in production
     });
-  }
 
-  isInitialized = true;
+    console.log("MSW initialized successfully");
+    isInitialized = true;
+  } catch (error) {
+    console.error("Failed to initialize MSW:", error);
+    // Don't throw - allow app to continue without MSW
+  }
 };

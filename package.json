@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:netlify": "npm run build",
     "lint": "eslint .",
     "preview": "vite preview",
     "seed": "tsx scripts/seed.ts",
