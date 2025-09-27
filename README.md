@@ -56,7 +56,7 @@ TalentFlow provides complete management capabilities across the entire hiring wo
 ##  Technical Capabilities & Testing
 
 ### **Error Resilience**
-The platform is explicitly designed for resilience, featuring **Optimistic UI** (immediate feedback with automatic rollback on network errors) and configurable **Error Simulation** through MSW, allowing developers to easily test failure scenarios ($\text{window.__MSW_ERROR_RATE__ = 0.5}$).
+The platform is explicitly designed for resilience, featuring **Optimistic UI** (immediate feedback with automatic rollback on network errors) and configurable **Error Simulation** through MSW, allowing developers to easily test failure scenarios (MSW_ERROR_RATE__ = 0.5).
 
 ### **Seeding and Testing**
 * It includes a comprehensive seed script ($\text{npm run seed}$) that populates the database with $\text{25}$ jobs, $\text{1000}$ candidates, and $\text{3}$ assessments.
